@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlphaFlow — Отчёт по симуляции</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Unbounded:wght@300;700;900&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #00ff88;
+    --accent2: #ff3b6b;
+    --accent3: #3b82f6;
+    --text: #e2e8f0;
+    --muted: #4a5568;
+    --win: #00ff88;
+    --loss: #ff3b6b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* GRID BACKGROUND */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* HEADER */
+  header {
+    margin-bottom: 56px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 32px;
+  }
+
+  .logo {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 11px;
+    font-weight: 300;
+    letter-spacing: 0.4em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    opacity: 0.8;
+  }
+
+  h1 {
+    font-family: 'Unbounded', sans-serif;
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 900;
+    line-height: 1.1;
+    color: #fff;
+    letter-spacing: -0.02em;
+  }
+
+  h1 span {
+    color: var(--accent);
+    display: block;
+  }
+
+  .report-date {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* KPI GRID */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+
+  .kpi {
+    background: var(--surface);
+    padding: 24px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.2s;
+  }
+
+  .kpi::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transition: transform 0.3s;
+    transform-origin: left;
+  }
+
+  .kpi:hover::after { transform: scaleX(1); }
+  .kpi:hover { background: #14141f; }
+
+  .kpi-label {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .kpi-value {
+    font-family: 'Unbounded', sans-serif;
+    font-size: clamp(20px, 3vw, 28px);
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+  }
+
+  .kpi-value.positive { color: var(--win); }
+  .kpi-value.negative { color: var(--loss); }
+  .kpi-value.neutral { color: var(--accent3); }
+
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* SECTIONS */
+  .section {
+    margin-bottom: 48px;
+  }
+
+  .section-title {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* CHART */
+  .chart-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px;
+    position: relative;
+  }
+
+  .chart-wrap canvas {
+    max-height: 280px;
+  }
+
+  /* MONTHLY TABLE */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead tr {
+    border-bottom: 2px solid var(--accent);
+  }
+
+  th {
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+
+  tbody tr:hover { background: #14141f; }
+
+  td {
+    padding: 12px 12px;
+    color: var(--text);
+  }
+
+  td.win { color: var(--win); font-weight: 600; }
+  td.loss { color: var(--loss); font-weight: 600; }
+  td.neutral { color: var(--accent3); }
+
+  /* BADGE */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+  }
+
+  .badge-tp { background: rgba(0,255,136,0.12); color: var(--win); border: 1px solid rgba(0,255,136,0.3); }
+  .badge-sl { background: rgba(255,59,107,0.12); color: var(--loss); border: 1px solid rgba(255,59,107,0.3); }
+  .badge-buy { background: rgba(59,130,246,0.12); color: var(--accent3); border: 1px solid rgba(59,130,246,0.3); }
+  .badge-sell { background: rgba(255,59,107,0.12); color: var(--loss); border: 1px solid rgba(255,59,107,0.3); }
+
+  /* FOOTER */
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .warning {
+    background: rgba(255,59,107,0.06);
+    border: 1px solid rgba(255,59,107,0.2);
+    padding: 16px 20px;
+    font-size: 12px;
+    color: #ff8099;
+    margin-bottom: 40px;
+    line-height: 1.6;
+  }
+
+  @media (max-width: 600px) {
+    .kpi-grid { grid-template-columns: 1fr 1fr; }
+    table { font-size: 11px; }
+    th, td { padding: 8px 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo">AlphaFlow Trading</div>
+    <h1>Отчёт<span>по сделкам</span></h1>
+    <div class="report-date">Сформирован: 19.02.2026, 07:04:18 · Стратегия: Donchian Levels · MOEX</div>
+  </header>
+
+  <!-- KPI -->
+  <div class="kpi-grid" id="kpi-grid"></div>
+
+  <div class="warning">
+    ⚠️ Данные получены в режиме симуляции. Результаты симуляции не гарантируют аналогичных результатов при реальной торговле. Торговля на бирже сопряжена с риском потери капитала.
+  </div>
+
+  <!-- EQUITY CURVE -->
+  <div class="section">
+    <div class="section-title">Кривая капитала</div>
+    <div class="chart-wrap">
+      <canvas id="equityChart"></canvas>
+    </div>
+  </div>
+
+  <!-- MONTHLY -->
+  <div class="section">
+    <div class="section-title">По месяцам</div>
+    <table id="monthly-table">
+      <thead>
+        <tr>
+          <th>Месяц</th>
+          <th>Сделок</th>
+          <th>Win</th>
+          <th>Loss</th>
+          <th>Win%</th>
+          <th>PnL</th>
+          <th>Просадка</th>
+        </tr>
+      </thead>
+      <tbody id="monthly-body"></tbody>
+    </table>
+  </div>
+
+  <!-- RECENT TRADES -->
+  <div class="section">
+    <div class="section-title">Последние сделки</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Дата</th>
+          <th>Тикер</th>
+          <th>Сторона</th>
+          <th>Вход</th>
+          <th>Выход</th>
+          <th>PnL %</th>
+          <th>Статус</th>
+        </tr>
+      </thead>
+      <tbody id="trades-body"></tbody>
+    </table>
+  </div>
+
+  <footer>
+    <span>AlphaFlow · Стратегия Donchian Levels · MOEX</span>
+    <span>Симуляция · 2026</span>
+  </footer>
+
+</div>
+
+<script>
+const equity = [{"date":"16.02.2026","pnl":-0.5,"ticker":"BSPB","side":"BUY","status":"SL_CLOSED"},{"date":"16.02.2026","pnl":1.51,"ticker":"APTK","side":"BUY","status":"TP_CLOSED"},{"date":"16.02.2026","pnl":1,"ticker":"AFLT","side":"BUY","status":"SL_CLOSED"},{"date":"16.02.2026","pnl":3.05,"ticker":"APTK","side":"BUY","status":"TP_CLOSED"},{"date":"17.02.2026","pnl":5.2,"ticker":"CBOM","side":"BUY","status":"TP_CLOSED"}]
+const monthly = [{"month":"февраль 2026 г.","totalTrades":5,"wins":3,"losses":2,"winRate":"60.0","totalPnl":5.196213668142143,"avgPnl":1.0392427336284285,"bestTrade":{"id":"93d0ae2c-6ebd-4c67-92ae-ab6bef509db2","ticker":"CBOM","priceBuy":6.138,"takeProfit":6.27,"stopLoss":6.1,"side":"BUY","status":"TP_CLOSED","qty":1,"createdAt":1771184687869,"entryPrice":6.138,"filledAt":1771215120000,"exitPrice":6.27,"closedAt":1771343580056,"pnl":2.1505376344085967},"worstTrade":{"id":"980b7ec9-9b4b-42f7-8576-59a51d81cfdc","ticker":"AFLT","priceBuy":57.2,"takeProfit":58.35,"stopLoss":56.91,"side":"BUY","status":"SL_CLOSED","qty":1,"createdAt":1771184687869,"entryPrice":57.2,"filledAt":1771214400000,"exitPrice":56.91,"closedAt":1771239180061,"pnl":-0.5069930069930179},"maxDrawdown":0.506993006993018}]
+const trades = [{"date":"17.02.2026","ticker":"CBOM","side":"BUY","entryPrice":6.138,"exitPrice":6.27,"pnl":"2.15","status":"TP_CLOSED"},{"date":"16.02.2026","ticker":"APTK","side":"BUY","entryPrice":8.516,"exitPrice":8.69,"pnl":"2.04","status":"TP_CLOSED"},{"date":"16.02.2026","ticker":"AFLT","side":"BUY","entryPrice":57.2,"exitPrice":56.91,"pnl":"-0.51","status":"SL_CLOSED"},{"date":"16.02.2026","ticker":"APTK","side":"BUY","entryPrice":8.46,"exitPrice":8.63,"pnl":"2.01","status":"TP_CLOSED"},{"date":"16.02.2026","ticker":"BSPB","side":"BUY","entryPrice":330,"exitPrice":328.35,"pnl":"-0.50","status":"SL_CLOSED"}]
+const stats = {"totalTrades":5,"wins":3,"losses":2,"winRate":"60.0","totalPnl":5.196213668142144,"avgPnl":1.0392427336284287,"bestTrade":{"id":"93d0ae2c-6ebd-4c67-92ae-ab6bef509db2","ticker":"CBOM","priceBuy":6.138,"takeProfit":6.27,"stopLoss":6.1,"side":"BUY","status":"TP_CLOSED","qty":1,"createdAt":1771184687869,"entryPrice":6.138,"filledAt":1771215120000,"exitPrice":6.27,"closedAt":1771343580056,"pnl":2.1505376344085967},"worstTrade":{"id":"980b7ec9-9b4b-42f7-8576-59a51d81cfdc","ticker":"AFLT","priceBuy":57.2,"takeProfit":58.35,"stopLoss":56.91,"side":"BUY","status":"SL_CLOSED","qty":1,"createdAt":1771184687869,"entryPrice":57.2,"filledAt":1771214400000,"exitPrice":56.91,"closedAt":1771239180061,"pnl":-0.5069930069930179},"maxDrawdown":0.506993006993018}
+
+// ---- KPI ----
+const kpis = [
+  { label: 'Всего сделок', value: stats.totalTrades, cls: 'neutral' },
+  { label: 'Winrate', value: stats.winRate + '%', cls: parseFloat(stats.winRate) >= 60 ? 'positive' : 'negative' },
+  { label: 'Общий PnL', value: stats.totalPnl.toFixed(1) + '%', cls: stats.totalPnl >= 0 ? 'positive' : 'negative', sub: 'суммарно по всем сделкам' },
+  { label: 'Ср. PnL сделки', value: stats.avgPnl.toFixed(2) + '%', cls: stats.avgPnl >= 0 ? 'positive' : 'negative' },
+  { label: 'Макс. просадка', value: '-' + stats.maxDrawdown.toFixed(1) + '%', cls: 'negative' },
+  { label: 'Лучшая сделка', value: '+' + stats.bestTrade?.pnl?.toFixed(2) + '%', cls: 'positive', sub: stats.bestTrade?.ticker },
+]
+
+const kpiGrid = document.getElementById('kpi-grid')
+kpis.forEach(k => {
+  kpiGrid.innerHTML += `
+    <div class="kpi">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value ${k.cls}">${k.value}</div>
+      ${k.sub ? `<div class="kpi-sub">${k.sub}</div>` : ''}
+    </div>
+  `
+})
+
+// ---- EQUITY CHART ----
+const ctx = document.getElementById('equityChart').getContext('2d')
+const isPositive = equity.length ? equity[equity.length-1].pnl >= 0 : true
+const lineColor = isPositive ? '#00ff88' : '#ff3b6b'
+
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: equity.map(e => e.date),
+    datasets: [{
+      label: 'Накопленный PnL %',
+      data: equity.map(e => e.pnl),
+      borderColor: lineColor,
+      borderWidth: 2,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      pointHoverBackgroundColor: lineColor,
+      fill: true,
+      backgroundColor: (ctx) => {
+        const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 280)
+        gradient.addColorStop(0, isPositive ? 'rgba(0,255,136,0.15)' : 'rgba(255,59,107,0.15)')
+        gradient.addColorStop(1, 'rgba(0,0,0,0)')
+        return gradient
+      },
+      tension: 0.3,
+    }]
+  },
+  options: {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#111118',
+        borderColor: '#1e1e2e',
+        borderWidth: 1,
+        titleColor: '#4a5568',
+        bodyColor: '#e2e8f0',
+        callbacks: {
+          label: ctx => ` PnL: ${ctx.parsed.y.toFixed(2)}%`
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color: '#4a5568', font: { family: 'IBM Plex Mono', size: 10 }, maxTicksLimit: 8 },
+        grid: { color: '#1e1e2e' }
+      },
+      y: {
+        ticks: {
+          color: '#4a5568',
+          font: { family: 'IBM Plex Mono', size: 10 },
+          callback: v => v.toFixed(1) + '%'
+        },
+        grid: { color: '#1e1e2e' }
+      }
+    }
+  }
+})
+
+// ---- MONTHLY TABLE ----
+const tbody = document.getElementById('monthly-body')
+monthly.forEach(m => {
+  const pnlClass = parseFloat(m.totalPnl) >= 0 ? 'win' : 'loss'
+  tbody.innerHTML += `
+    <tr>
+      <td>${m.month}</td>
+      <td class="neutral">${m.totalTrades}</td>
+      <td class="win">${m.wins}</td>
+      <td class="loss">${m.losses}</td>
+      <td class="${parseFloat(m.winRate) >= 60 ? 'win' : 'loss'}">${m.winRate}%</td>
+      <td class="${pnlClass}">${parseFloat(m.totalPnl) >= 0 ? '+' : ''}${m.totalPnl.toFixed(1)}%</td>
+      <td class="loss">-${m.maxDrawdown.toFixed(1)}%</td>
+    </tr>
+  `
+})
+
+// ---- RECENT TRADES ----
+const tradesTbody = document.getElementById('trades-body')
+trades.forEach(t => {
+  const pnl = parseFloat(t.pnl)
+  tradesTbody.innerHTML += `
+    <tr>
+      <td style="color:var(--muted)">${t.date}</td>
+      <td style="font-weight:600">${t.ticker}</td>
+      <td><span class="badge ${t.side === 'BUY' ? 'badge-buy' : 'badge-sell'}">${t.side}</span></td>
+      <td>${t.entryPrice ?? '—'}</td>
+      <td>${t.exitPrice ?? '—'}</td>
+      <td class="${pnl >= 0 ? 'win' : 'loss'}">${pnl >= 0 ? '+' : ''}${t.pnl}%</td>
+      <td><span class="badge ${t.status === 'TP_CLOSED' ? 'badge-tp' : 'badge-sl'}">${t.status === 'TP_CLOSED' ? 'TP' : 'SL'}</span></td>
+    </tr>
+  `
+})
+</script>
+</body>
+</html>
