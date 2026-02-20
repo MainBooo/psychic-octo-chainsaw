@@ -400,7 +400,7 @@ const html = `<!DOCTYPE html>
 
   <header>
     <div class="logo">AlphaFlow Trading</div>
-    <h1>Отчёт<span>по симуляции</span></h1>
+    <h1>Отчёт<span>по автотрейдингу</span></h1>
     <div class="report-date">Сформирован: ${new Date().toLocaleString('ru-RU')} · Стратегия: Donchian Levels · MOEX</div>
   </header>
 
