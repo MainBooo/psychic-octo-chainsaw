@@ -445,46 +445,53 @@ async trackOrders() {
 	// ==========================================================
 
 	private saveOrdersByStatus() {
-		const all = [...this.ordersBuy.values(), ...this.ordersSell.values()]
+    const all = [...this.ordersBuy.values(), ...this.ordersSell.values()]
 
-		const map = {
-			pending: all.filter(o => o.status === 'PENDING'),
-			active: all.filter(o => o.status === 'FILLED'),
-			takeprofit: all.filter(o => o.status === 'TP_CLOSED'),
-			stoploss: all.filter(o => o.status === 'SL_CLOSED'),
-		}
+    // pending и active — просто перезаписываем актуальным состоянием из памяти
+    const liveMap = {
+        pending: all.filter(o => o.status === 'PENDING'),
+        active: all.filter(o => o.status === 'FILLED'),
+    }
 
-		for (const [status, newOrders] of Object.entries(map)) {
-			const filePath = path.join(this.dataDir, `${status}.json`)
-			let existingOrders = []
+    for (const [status, orders] of Object.entries(liveMap)) {
+        const filePath = path.join(this.dataDir, `${status}.json`)
+        fs.mkdirSync(path.dirname(filePath), { recursive: true })
+        fs.writeFileSync(filePath, JSON.stringify(orders, null, 2))
+    }
 
-			// Если файл существует, читаем существующие ордера
-			if (fs.existsSync(filePath)) {
-				try {
-					const fileContent = fs.readFileSync(filePath, 'utf-8')
-					existingOrders = JSON.parse(fileContent)
-				} catch (err) {
-					console.error(`Ошибка чтения файла ${filePath}:`, err)
-					existingOrders = []
-				}
-			}
+    // takeprofit и stoploss — накапливаем историю, дедублицируем по id
+    const historyMap = {
+        takeprofit: all.filter(o => o.status === 'TP_CLOSED'),
+        stoploss: all.filter(o => o.status === 'SL_CLOSED'),
+    }
 
-			// Объединяем новые и существующие ордера
-			const combinedOrders = [...existingOrders, ...newOrders]
+    for (const [status, newOrders] of Object.entries(historyMap)) {
+        const filePath = path.join(this.dataDir, `${status}.json`)
+        fs.mkdirSync(path.dirname(filePath), { recursive: true })
 
-			// Убираем дубликаты по priceSell, takeProfit и stopLoss
-			const seen = new Set()
-			const uniqueOrders = combinedOrders.filter(o => {
-				const key = `${o.priceSell}-${o.takeProfit}-${o.stopLoss}`
-				if (seen.has(key)) return false
-				seen.add(key)
-				return true
-			})
+        let existingOrders: SimOrder[] = []
 
-			// Сохраняем обратно в файл
-			fs.writeFileSync(filePath, JSON.stringify(uniqueOrders, null, 2))
-		}
-	}
+        if (fs.existsSync(filePath)) {
+            try {
+                existingOrders = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+            } catch (err) {
+                this.logger.error(`Ошибка чтения файла ${filePath}: ${err}`)
+                existingOrders = []
+            }
+        }
+
+        // Объединяем и дедублицируем по id
+        const existingIds = new Set(existingOrders.map(o => o.id))
+        const toAdd = newOrders.filter(o => !existingIds.has(o.id))
+        const combined = [...existingOrders, ...toAdd]
+
+        fs.writeFileSync(filePath, JSON.stringify(combined, null, 2))
+
+        if (toAdd.length > 0) {
+            this.logger.log(`Сохранено ${toAdd.length} новых ордеров в ${status}.json`)
+        }
+    }
+}
 
 	private loadOrders() {
 		const load = (file: string, side: 'BUY' | 'SELL') => {
