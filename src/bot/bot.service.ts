@@ -124,6 +124,8 @@ export class BotService implements OnModuleInit {
 		this.registerCallbackRouter()
 		this.registerMenuHandlers()
 		this.watchPendingOrders()
+  this.watchOrders(this.ordersBuyPath, 'BUY')  
+  this.watchOrders(this.ordersSellPath, 'SELL')
 
 		this.startPendingCleaner()
 
