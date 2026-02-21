@@ -227,10 +227,10 @@ export function getOrdersSell(ticker: string) {
 			const MIN_SEC = BAR_SEC * MIN_BARS // 18 000
 
 			// 1) local должен быть ПОЗЖЕ global
-			if (lBar <= gBar) continue
+			if (lBar >= gBar) continue
 
 			// 2) прошло минимум 20 баров
-			if (lBar - gBar < MIN_SEC) continue
+			if (gBar - lBar < MIN_SEC) continue
 
 			// 3) цена подошла к уровню СВЕРХУ
 			if (lPrice <= gPrice) continue
@@ -239,7 +239,7 @@ export function getOrdersSell(ticker: string) {
 			const diff = (lPrice - gPrice) / gPrice
 			if (diff > 0.002) continue
 
-			const barsPassed = Math.floor((lBar - gBar) / 900)
+			const barsPassed = Math.floor((gBar - lBar) / 900)
 
 			const reasons: string[] = []
 
