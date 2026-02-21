@@ -91,11 +91,13 @@ ALOR_PORTFOLIO=your_portfolio
 npm run dev
 ```
 
-### Продакшн режим
+### Продакшн режим. запуск скана ордеров и Telegram-бота
 
 ```bash
 npm run build
-npm start
+pm2 start ecosystem-app.config.cjs
+pm2 start ecosystem-bot.config.cjs
+
 ```
 
 ### Запуск бота
